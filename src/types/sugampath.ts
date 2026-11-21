@@ -14,6 +14,10 @@ export interface UserProfile {
   voiceEnabled: boolean;
   highContrast: boolean;
   visualOnly?: boolean;
+  /** Person alerted by SOS / fall detection. Stored on this device only. */
+  emergencyContact?: { name: string; phone: string } | null;
+  /** Share anonymous surface readings (smooth / rough / stairs) while walking. Default on. */
+  passiveMapping?: boolean;
 }
 
 export type VerificationLabel = 'verified' | 'ai_estimate' | 'not_verified' | 'unrated';

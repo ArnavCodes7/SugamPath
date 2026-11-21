@@ -2,6 +2,8 @@ import { Building2, RotateCcw, UserCheck, X } from 'lucide-react';
 import { STRINGS } from '../lib/i18n';
 import type { CitySlug, LanguageCode, TravelMode, UserProfile } from '../types/sugampath';
 import { PWAInstallButton } from './PWAInstallButton';
+import { EmergencyContactCard } from './safety/EmergencyContactCard';
+import { SAFE } from '../lib/i18nSafety';
 
 interface PreferencesModalProps {
   open: boolean;
@@ -224,6 +226,26 @@ export function PreferencesModal({
           </div>
         </div>
 
+        {/* Safety: who gets alerted, and whether walks help map surfaces */}
+        <div className="space-y-2.5 pt-2 border-t border-[var(--border-line)]">
+          <EmergencyContactCard
+            language={profile.language}
+            contact={profile.emergencyContact}
+            onChange={(c) => onUpdateProfile({ emergencyContact: c })}
+          />
+          <button
+            type="button"
+            onClick={() => onUpdateProfile({ passiveMapping: profile.passiveMapping === false })}
+            aria-pressed={profile.passiveMapping !== false}
+            className={`w-full px-3 py-2.5 rounded-xl border text-xs font-bold min-h-[44px] text-left ${
+              profile.passiveMapping !== false
+                ? 'bg-[var(--tactile-yellow-soft)] border-[var(--ink-primary)] text-[var(--ink-primary)]'
+                : 'bg-[var(--bg-paper)] border-[var(--border-line)] text-[var(--ink-primary)]'
+            }`}
+          >
+            {SAFE[profile.language].mappingLabel}: {profile.passiveMapping !== false ? t.on : t.off}
+          </button>
+        </div>
         {/* Role Switch, PWA Install, Offline Test */}
         <div className="space-y-2.5 pt-2 border-t border-[var(--border-line)]">
           <button

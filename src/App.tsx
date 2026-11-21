@@ -397,6 +397,9 @@ export default function App() {
             isOffline={isOffline}
             onToggleOffline={() => setIsOffline((v) => !v)}
             onOpenPreferences={() => setPrefsOpen(true)}
+            emergencyContact={profile.emergencyContact ?? null}
+            passiveMapping={profile.passiveMapping !== false}
+            onSaveContact={(c) => updateProfile({ emergencyContact: c })}
             onVerifyGate={handleVerifyGate}
             onFocusPlaceCity={handleFocusPlaceCity}
             onAuditComplete={handleAuditComplete}

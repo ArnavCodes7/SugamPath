@@ -20,6 +20,7 @@ import type {
 } from '../types/sugampath';
 import { InteractiveMap } from './InteractiveMap';
 import { TrustLabelText } from './ScoreBadge';
+import { LegalReportPanel } from './safety/LegalReportPanel';
 
 export type AuditorTab = 'fixlist' | 'demo';
 
@@ -393,6 +394,13 @@ export function AuditorConsole({
                       </button>
                     </div>
                   </div>
+
+                  <LegalReportPanel
+                    key={selectedIssue.id}
+                    issue={selectedIssue}
+                    place={places.find((p) => p.id === selectedIssue.place_id)}
+                    language={language}
+                  />
 
                   <ul className="space-y-1.5 text-xs pt-2 border-t border-[var(--border-line)]">
                     {selectedIssue.events.slice(0, 3).map((ev) => (

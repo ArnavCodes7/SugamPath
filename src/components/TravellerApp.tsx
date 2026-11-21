@@ -40,6 +40,22 @@ import type {
   TravelMode,
 } from '../types/sugampath';
 import { InteractiveMap } from './InteractiveMap';
+import { backend } from '../services/backend';
+import { useWalkSession, type WalkRoute } from '../hooks/useWalkSession';
+import { cautionText, effortLine, SAFE } from '../lib/i18nSafety';
+import { computeEffort } from '../lib/safety/effort';
+import { useMeasuredSlope } from '../lib/safety/elevation';
+import { getActiveHazards, HAZARDS_CHANGED_EVENT, reportHazardLocal } from '../lib/safety/hazards';
+import { loadActiveTrip } from '../lib/safety/offlineCache';
+import { getSmoothPct } from '../lib/safety/surfaceStore';
+import type { ActiveTrip, EmergencyContact } from '../types/safety';
+import { ArrivalCheck } from './safety/ArrivalCheck';
+import { BlindWalkingMode } from './safety/BlindWalkingMode';
+import { CautionList } from './safety/CautionList';
+import { EmergencyContactCard } from './safety/EmergencyContactCard';
+import { HoldButton } from './safety/HoldButton';
+import { ShareTrip } from './safety/ShareTrip';
+import { SosOverlay } from './safety/SosOverlay';
 import { PhotoAuditWizard } from './PhotoAuditWizard';
 import { ScoreBadge, TrustLabelText } from './ScoreBadge';
 
@@ -57,6 +73,9 @@ interface TravellerAppProps {
   isOffline: boolean;
   onToggleOffline: () => void;
   onOpenPreferences: () => void;
+  emergencyContact: EmergencyContact | null;
+  passiveMapping: boolean;
+  onSaveContact: (c: EmergencyContact) => void;
   onVerifyGate: (placeId: string, gateId: string, vote: 'confirm' | 'dispute') => void;
   onFocusPlaceCity: (placeId: string) => void;
   onAuditComplete: (payload: {
@@ -104,11 +123,15 @@ export function TravellerApp({
   isOffline,
   onToggleOffline,
   onOpenPreferences,
+  emergencyContact,
+  passiveMapping,
+  onSaveContact,
   onVerifyGate,
   onFocusPlaceCity,
   onAuditComplete,
 }: TravellerAppProps) {
   const t = STRINGS[language];
+  const S = SAFE[language];
   const isBlindSafeMode = mode === 'blind';
   const allowVoice = !visualOnly && (voiceEnabled || isBlindSafeMode);
 
@@ -193,6 +216,165 @@ export function TravellerApp({
       })),
     [routeCompare.accessible.steps, routeLocale]
   );
+
+  // ------------------------------------------------------------------
+  // Safety layer: hazards, effort, walk session (one Start for every mode)
+  // ------------------------------------------------------------------
+  const routePlace = places.find((p) => p.id === activeRoutePair.place_id) || selectedPlace;
+  const [hazardTick, setHazardTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setHazardTick((n) => n + 1);
+    window.addEventListener(HAZARDS_CHANGED_EVENT, bump);
+    const id = window.setInterval(bump, 60_000); // transient cautions expire on their own
+    return () => {
+      window.removeEventListener(HAZARDS_CHANGED_EVENT, bump);
+      window.clearInterval(id);
+    };
+  }, []);
+  const hazards = useMemo(
+    () => getActiveHazards(routePlace.id),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [routePlace.id, hazardTick]
+  );
+  const stdGate = routeCompare.standard.gate_chosen;
+  const accGate = routeCompare.accessible.gate_chosen;
+  const routeHazards = useMemo(
+    () => hazards.filter((h) => h.gateName === accGate || h.gateName === stdGate),
+    [hazards, accGate, stdGate]
+  );
+
+  const stdSlope = useMeasuredSlope(activeRoutePair.id, `${mode}-std`, routeCompare.standard, routePlace);
+  const accSlope = useMeasuredSlope(activeRoutePair.id, `${mode}-acc`, routeCompare.accessible, routePlace);
+  const effortStd = useMemo(
+    () =>
+      computeEffort(routeCompare.standard, {
+        mode,
+        hazards,
+        smoothPct: getSmoothPct(activeRoutePair.id, 'standard'),
+        measuredSlopeDeg: stdSlope,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [routeCompare, mode, hazards, stdSlope, hazardTick]
+  );
+  const effortAcc = useMemo(
+    () =>
+      computeEffort(routeCompare.accessible, {
+        mode,
+        hazards,
+        smoothPct: getSmoothPct(activeRoutePair.id, 'accessible'),
+        measuredSlopeDeg: accSlope,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [routeCompare, mode, hazards, accSlope, hazardTick]
+  );
+  const easiestIsAccessible = effortAcc.score <= effortStd.score;
+
+  const walkRoute: WalkRoute = useMemo(
+    () => ({
+      routeId: activeRoutePair.id,
+      placeId: routePlace.id,
+      placeName: getPlaceName(routePlace, language),
+      gateName: accGate,
+      title: activeRoutePair.title,
+      steps: localizedSteps.map((st) => ({ id: st.id, instruction: st.instruction, distance_m: st.distance_m })),
+      points: routeCompare.accessible.points,
+      cautions: routeHazards.filter((h) => h.gateName === accGate).map((h) => cautionText(h, language)),
+    }),
+    [activeRoutePair, routePlace, language, accGate, localizedSteps, routeCompare, routeHazards]
+  );
+
+  const session = useWalkSession({
+    language,
+    contact: emergencyContact,
+    passiveMapping,
+    visualOnly,
+    route: walkRoute,
+    stepIndex: stepFocusIndex,
+    onStepChange: setStepFocusIndex,
+  });
+  const walking = session.phase !== 'idle';
+
+  const beginWalk = async () => {
+    setStepFocusActive(true);
+    await session.start({ warmUp: isBlindSafeMode });
+  };
+  const endWalk = () => {
+    session.stop();
+    setStepFocusActive(false);
+  };
+
+  const gateName = routeCompare.accessible.gate_chosen;
+  const handleArrivalAnswer = (stepFree: boolean) => {
+    const gate = routePlace.gates.find((g) => g.name === gateName) || bestGate;
+    if (gate) onVerifyGate(routePlace.id, gate.id, stepFree ? 'confirm' : 'dispute');
+    const at = Date.now();
+    void backend.submitArrivalCheck({ placeId: routePlace.id, gateName, stepFree, at });
+    if (!stepFree) {
+      // One "No" is a live caution (lift gate: 14-day maintenance, otherwise 3-hour transient). Never a permanent mark.
+      const kind = gate?.lift_present === 'yes' ? 'broken_lift' : 'blocked_path';
+      reportHazardLocal({ placeId: routePlace.id, gateName, kind, source: 'arrival-check', at });
+      void backend.reportHazard({ placeId: routePlace.id, gateName, kind, source: 'arrival-check', at });
+    }
+  };
+  const handleArrivalDone = () => {
+    session.stop(false);
+    setStepFocusActive(false);
+    onTabChange('home');
+  };
+
+  // Non-blind users hear each step as it comes up (by tap on Next or by walking distance).
+  useEffect(() => {
+    if (isBlindSafeMode || !stepFocusActive || session.phase !== 'walking') return;
+    speakText(localizedSteps[stepFocusIndex]?.instruction || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepFocusIndex, stepFocusActive, session.phase]);
+
+  // Offline Corridor Survival: offer to pick an interrupted walk back up.
+  const [resumable, setResumable] = useState<ActiveTrip | null>(null);
+  const [pendingResume, setPendingResume] = useState<ActiveTrip | null>(null);
+  useEffect(() => {
+    void loadActiveTrip().then((trip) => trip && setResumable(trip));
+  }, []);
+  const doResume = async (trip: ActiveTrip) => {
+    onTabChange('route');
+    setStepFocusActive(true);
+    await session.start({ resume: trip, warmUp: isBlindSafeMode });
+  };
+  const resumeWalk = () => {
+    const trip = resumable;
+    if (!trip) return;
+    setResumable(null);
+    if (trip.placeId === routePlace.id) {
+      void doResume(trip);
+    } else {
+      onFocusPlaceCity(trip.placeId);
+      setSelectedPlaceId(trip.placeId);
+      setPendingResume(trip);
+    }
+  };
+  useEffect(() => {
+    if (pendingResume && routePlace.id === pendingResume.placeId) {
+      const trip = pendingResume;
+      setPendingResume(null);
+      void doResume(trip);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingResume, routePlace.id]);
+
+  const resumeBanner =
+    resumable && !walking ? (
+      <div role="status" className="p-4 rounded-2xl bg-[var(--tactile-yellow-soft)] border border-[var(--ink-primary)] space-y-3">
+        <p className="text-sm font-bold text-[var(--ink-primary)]">{S.resumeTitle(resumable.placeName)}</p>
+        <div className="grid grid-cols-2 gap-2.5">
+          <button type="button" onClick={resumeWalk} className="py-3 rounded-xl bg-[var(--ink-primary)] text-[var(--bg-surface)] text-sm font-bold min-h-[48px]">
+            {S.resumeBtn}
+          </button>
+          <button type="button" onClick={() => setResumable(null)} className="py-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-line)] text-sm font-bold text-[var(--ink-primary)] min-h-[48px]">
+            {S.resumeDismiss}
+          </button>
+        </div>
+      </div>
+    ) : null;
 
   // Automatic voice intro ONLY when Blind Safe Mode is active
   useEffect(() => {
@@ -345,6 +527,23 @@ export function TravellerApp({
 
     return (
       <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
+        {walking && (
+          <BlindWalkingMode
+            session={session}
+            route={walkRoute}
+            stepIndex={stepFocusIndex}
+            language={language}
+            contact={emergencyContact}
+            gateLabel={localizeGateName(gateName, language)}
+            onExit={() => {
+              endWalk();
+              speakText(getPlaceName(selectedPlace, language));
+            }}
+            onArrivalAnswer={handleArrivalAnswer}
+            onArrivalDone={handleArrivalDone}
+          />
+        )}
+        {resumeBanner}
         {/* Guardrail Note + Voice Controls */}
         <div className="p-4 rounded-3xl bg-[var(--tactile-yellow-soft)] border-2 border-[var(--ink-primary)] space-y-3">
           <div className="flex items-center gap-2 text-xs font-bold text-[var(--ink-primary)]">
@@ -451,12 +650,18 @@ export function TravellerApp({
                   · {t.steps}: {bestGate.steps_count ?? 0}
                 </div>
 
+                <EmergencyContactCard
+                  language={language}
+                  contact={emergencyContact}
+                  onChange={onSaveContact}
+                  large
+                />
+
                 <button
                   type="button"
                   onClick={() => {
                     onTabChange('route');
-                    setStepFocusIndex(0);
-                    speakText(`${t.safestWay}. ${activeSteps[0]?.instruction || ''}`);
+                    void beginWalk();
                   }}
                   className="w-full py-4 px-5 rounded-2xl bg-[var(--ink-primary)] text-[var(--bg-surface)] text-lg font-bold flex items-center justify-center gap-2 min-h-[64px]"
                 >
@@ -544,6 +749,18 @@ export function TravellerApp({
   // =========================================================================
   return (
     <div className="max-w-xl mx-auto px-4 py-5 space-y-5">
+      {tab === 'home' && resumeBanner}
+      <SosOverlay session={session} contact={emergencyContact} language={language} />
+      {session.phase === 'arrived' && (
+        <ArrivalCheck
+          gateName={localizeGateName(gateName, language)}
+          language={language}
+          mappedM={session.mappedM}
+          speakIt={allowVoice}
+          onAnswer={handleArrivalAnswer}
+          onDone={handleArrivalDone}
+        />
+      )}
       {/* HOME SCREEN: PICK A STATION -> SEE VISUAL CLUES + 1 BIG ACTION */}
       {tab === 'home' && (
         <div className="space-y-5">
@@ -1049,17 +1266,18 @@ export function TravellerApp({
           )}
 
           {/* Visual 2-Card Clue: Red Avoid vs Green Safe */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="p-4 rounded-2xl bg-[var(--status-red-soft)] border border-[var(--status-red)]/30 space-y-1">
               <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--status-red)]">
                 <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span>{t.shortestWay}</span>
+                {!easiestIsAccessible && <span className="ml-auto px-2 py-0.5 rounded-full bg-[var(--ink-primary)] text-[var(--bg-surface)]">{S.easiest}</span>}
               </div>
               <div className="text-lg font-bold font-mono-tabular text-[var(--ink-primary)]">
                 {routeCompare.standard.stairs_count} {t.stairsCount}
               </div>
-              <div className="text-xs text-[var(--ink-secondary)] font-mono-tabular">
-                {routeCompare.standard.distance_m} {t.distance}
+              <div className="text-xs text-[var(--ink-secondary)] font-mono-tabular leading-relaxed">
+                {effortLine(effortStd, language)}
               </div>
             </div>
 
@@ -1067,15 +1285,18 @@ export function TravellerApp({
               <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--status-good)]">
                 <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span>{t.safestWay}</span>
+                {easiestIsAccessible && <span className="ml-auto px-2 py-0.5 rounded-full bg-[var(--ink-primary)] text-[var(--bg-surface)]">{S.easiest}</span>}
               </div>
               <div className="text-lg font-bold font-mono-tabular text-[var(--ink-primary)]">
-                {t.noStairs}
+                {routeCompare.accessible.stairs_count === 0 ? t.noStairs : `${routeCompare.accessible.stairs_count} ${t.stairsCount}`}
               </div>
-              <div className="text-xs text-[var(--ink-secondary)] font-mono-tabular">
-                {routeCompare.accessible.duration_min} min · {routeCompare.accessible.distance_m} {t.distance}
+              <div className="text-xs text-[var(--ink-secondary)] font-mono-tabular leading-relaxed">
+                {routeCompare.accessible.duration_min} min · {effortLine(effortAcc, language)}
               </div>
             </div>
           </div>
+
+          <CautionList hazards={routeHazards} language={language} />
 
           {/* Step-by-step Card OR Full Step List */}
           {stepFocusActive ? (
@@ -1091,10 +1312,33 @@ export function TravellerApp({
                 {localizedSteps[stepFocusIndex]?.instruction}
               </div>
 
+              {session.trackUrl && (
+                <ShareTrip
+                  url={session.trackUrl}
+                  language={language}
+                  contact={emergencyContact}
+                  placeName={getPlaceName(routePlace, language)}
+                />
+              )}
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--status-good)]">
+                  <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+                  {S.safetyOn}
+                </span>
+                <HoldButton
+                  holdMs={2000}
+                  onActivate={() => session.triggerSos('manual')}
+                  className="px-3.5 py-2 rounded-xl border-2 border-[var(--status-red)] text-[var(--status-red)] text-xs font-bold min-h-[44px]"
+                >
+                  {S.sosHold}
+                </HoldButton>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setStepFocusActive(false)}
+                  onClick={endWalk}
                   className="py-3.5 px-4 rounded-2xl bg-[var(--bg-paper)] border border-[var(--border-line)] text-sm font-bold text-[var(--ink-primary)] min-h-[50px]"
                 >
                   {t.stopNavigationBtn}
@@ -1102,14 +1346,8 @@ export function TravellerApp({
                 <button
                   type="button"
                   onClick={() => {
-                    if (stepFocusIndex < localizedSteps.length - 1) {
-                      const next = stepFocusIndex + 1;
-                      setStepFocusIndex(next);
-                      speakText(localizedSteps[next].instruction);
-                    } else {
-                      setStepFocusActive(false);
-                      speakText(t.arrivedLabel);
-                    }
+                    if (stepFocusIndex >= localizedSteps.length - 1) speakText(t.arrivedLabel);
+                    session.advance(); // last step -> arrival check
                   }}
                   className="py-3.5 px-4 rounded-2xl bg-[var(--ink-primary)] text-[var(--bg-surface)] text-sm font-bold min-h-[50px]"
                 >
@@ -1171,13 +1409,24 @@ export function TravellerApp({
                 ))}
               </ol>
 
+              {emergencyContact ? (
+                <p className="text-xs font-semibold text-[var(--ink-secondary)] flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-[var(--status-good)]" aria-hidden="true" />
+                  {S.safetyOn} · {S.contactSaved(emergencyContact.name)}
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onOpenPreferences}
+                  className="text-xs font-bold underline underline-offset-4 text-[var(--ink-primary)] min-h-[40px]"
+                >
+                  {S.contactNone}. {S.contactTitle}
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={() => {
-                  setStepFocusActive(true);
-                  setStepFocusIndex(0);
-                  speakText(localizedSteps[0]?.instruction || '');
-                }}
+                onClick={() => void beginWalk()}
                 className="w-full py-4 px-5 rounded-2xl bg-[var(--ink-primary)] text-[var(--bg-surface)] text-base font-bold flex items-center justify-center gap-2 min-h-[54px]"
               >
                 <Navigation className="w-4 h-4" aria-hidden="true" />
