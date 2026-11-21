@@ -72,6 +72,7 @@ export default defineConfig(({mode}) => {
         },
         workbox: {
           navigateFallbackDenylist: [/^\/api\//],
+          maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,woff,woff2}'],
           runtimeCaching: [
             {
@@ -128,6 +129,11 @@ export default defineConfig(({mode}) => {
         },
       },
     ],
+    optimizeDeps: {
+      // react-map-gl imports maplibre lazily; pre-bundle it so the dev server never
+      // re-optimizes mid-load (504 "Outdated Optimize Dep" / blank map).
+      include: ['maplibre-gl', 'react-map-gl/maplibre'],
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

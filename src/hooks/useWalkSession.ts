@@ -38,6 +38,8 @@ interface Options {
   route: WalkRoute;
   stepIndex: number;
   onStepChange: (i: number) => void;
+  /** The live map matches GPS to the route and calls advance() itself; skip distance-based auto advance while GPS is fresh. */
+  geoDriven?: boolean;
 }
 
 export type WalkPhase = 'idle' | 'walking' | 'arrived';
@@ -224,6 +226,8 @@ export function useWalkSession(opts: Options) {
     walked.current.step += m;
     walked.current.total += m;
     const step = o.current.route.steps[stepIdx.current];
+    const gpsFresh = Date.now() - lastGpsAt.current < 8000;
+    if (o.current.geoDriven && gpsFresh) return; // the map decides where we are
     if (step && walked.current.step >= step.distance_m * ADVANCE_AT) advance();
   }, [advance]);
 

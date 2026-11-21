@@ -94,27 +94,6 @@ export function PreferencesModal({
           </div>
         </div>
 
-        {/* City */}
-        <div className="space-y-2">
-          <div className="text-xs font-bold text-[var(--ink-secondary)]">{t.myCityLabel}</div>
-          <div className="grid grid-cols-3 gap-2">
-            {(['patiala', 'chandigarh', 'new-delhi'] as CitySlug[]).map((slug) => (
-              <button
-                key={slug}
-                type="button"
-                onClick={() => onUpdateProfile({ city: slug })}
-                className={`py-2.5 px-2 rounded-xl border text-xs sm:text-sm font-bold min-h-[44px] ${
-                  profile.city === slug
-                    ? 'bg-[var(--tactile-yellow)] border-[var(--ink-primary)] text-[var(--tactile-yellow-ink)]'
-                    : 'bg-[var(--bg-paper)] border-[var(--border-line)] text-[var(--ink-primary)]'
-                }`}
-              >
-                {t.cities[slug]}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Travel Aid (when in Traveller role) */}
         {profile.role === 'traveller' && (
           <div className="space-y-2">

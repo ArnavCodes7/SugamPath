@@ -9,7 +9,6 @@ import {
   MessageSquarePlus,
   X,
 } from 'lucide-react';
-import { PATH_SEGMENTS } from '../data/mockSugamData';
 import { ISSUE_TRANSLATIONS, localizeGateName, localizePlaceName, STRINGS } from '../lib/i18n';
 import type {
   AuditIssue,
@@ -18,7 +17,8 @@ import type {
   LanguageCode,
   Place,
 } from '../types/sugampath';
-import { InteractiveMap } from './InteractiveMap';
+import { CampusMap } from './campus/CampusMap';
+import type { TravelMode } from '../types/sugampath';
 import { TrustLabelText } from './ScoreBadge';
 import { LegalReportPanel } from './safety/LegalReportPanel';
 
@@ -53,6 +53,7 @@ export function AuditorConsole({
   const [statusFilter, setStatusFilter] = useState<IssueStatus | 'all'>('all');
   const [mapCity, setMapCity] = useState<CitySlug>(defaultCity);
   const [mapOpen, setMapOpen] = useState(false);
+  const [mapMode, setMapMode] = useState<TravelMode>('wheelchair');
   const [selectedId, setSelectedId] = useState<string>(issues[0]?.id || '');
   const [note, setNote] = useState('');
   const [brokenPhoto, setBrokenPhoto] = useState<Record<string, boolean>>({});
@@ -102,7 +103,7 @@ export function AuditorConsole({
       setCityFilter('all');
       setStatusFilter('all');
       setSelectedId('ISS-1042');
-      setMapCity('new-delhi');
+      setMapCity('patiala');
       onTabChange('fixlist');
     } else if (stepIndex === 2) {
       onDownloadCsv();
@@ -111,9 +112,6 @@ export function AuditorConsole({
     }
   };
 
-  const mapPlaces = places.filter((p) => p.city === mapCity);
-  const mapSegments = PATH_SEGMENTS.filter((s) => s.city === mapCity);
-  const mapIssues = issues.filter((i) => i.city === mapCity && i.status !== 'fixed');
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-5 space-y-5">
@@ -237,8 +235,6 @@ export function AuditorConsole({
                   >
                     <option value="all">{t.allCities}</option>
                     <option value="patiala">{t.cities.patiala}</option>
-                    <option value="chandigarh">{t.cities.chandigarh}</option>
-                    <option value="new-delhi">{t.cities['new-delhi']}</option>
                   </select>
 
                   <select
@@ -431,28 +427,12 @@ export function AuditorConsole({
           aria-labelledby="auditor-map-title"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
         >
-          <div className="w-full max-w-3xl bg-[var(--bg-surface)] border border-[var(--border-line)] rounded-3xl overflow-hidden">
+          <div className="w-full max-w-5xl bg-[var(--bg-surface)] border border-[var(--border-line)] rounded-3xl overflow-hidden">
             <div className="px-5 py-3.5 border-b border-[var(--border-line)] flex flex-wrap items-center justify-between gap-3">
               <h2 id="auditor-map-title" className="text-base font-bold text-[var(--ink-primary)]">
                 {t.mapHeading}
               </h2>
               <div className="flex items-center gap-2">
-                <div className="flex gap-1 p-1 bg-[var(--bg-subtle)] rounded-lg">
-                  {(['patiala', 'chandigarh', 'new-delhi'] as CitySlug[]).map((slug) => (
-                    <button
-                      key={slug}
-                      type="button"
-                      onClick={() => setMapCity(slug)}
-                      className={`px-3 py-1 text-xs font-bold rounded-md min-h-[34px] ${
-                        mapCity === slug
-                          ? 'bg-[var(--tactile-yellow)] text-[var(--tactile-yellow-ink)]'
-                          : 'text-[var(--ink-secondary)]'
-                      }`}
-                    >
-                      {t.cities[slug]}
-                    </button>
-                  ))}
-                </div>
                 <button
                   type="button"
                   onClick={() => setMapOpen(false)}
@@ -464,23 +444,8 @@ export function AuditorConsole({
               </div>
             </div>
 
-            <div className="h-[360px]">
-              <InteractiveMap
-                city={mapCity}
-                language={language}
-                mode="wheelchair"
-                mapMode="auditor"
-                places={mapPlaces}
-                selectedPlace={mapPlaces[0] || places[0]}
-                segments={mapSegments}
-                issues={mapIssues}
-                selectedIssueId={selectedIssue?.id}
-                onSelectIssue={(id) => {
-                  setSelectedId(id);
-                  setMapOpen(false);
-                }}
-                controlsBottomOffsetClass="bottom-3"
-              />
+            <div className="h-[75vh] overflow-y-auto">
+              <CampusMap mode={mapMode} onModeChange={setMapMode} showModeSelector language={language} className="md:h-full" />
             </div>
           </div>
         </div>

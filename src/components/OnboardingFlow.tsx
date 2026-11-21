@@ -188,15 +188,6 @@ export function OnboardingFlow({ initialProfile, onComplete }: OnboardingFlowPro
       speak(t.cities.patiala, draft.language);
       return;
     }
-    if (q.includes('chandigarh') || q.includes('चंडीगढ़') || q.includes('ਚੰਡੀਗੜ੍ਹ')) {
-      setDraft((p) => ({ ...p, city: 'chandigarh' }));
-      speak(t.cities.chandigarh, draft.language);
-      return;
-    }
-    if (q.includes('delhi') || q.includes('दिल्ली') || q.includes('ਦਿੱਲੀ')) {
-      setDraft((p) => ({ ...p, city: 'new-delhi' }));
-      speak(t.cities['new-delhi'], draft.language);
-    }
   };
 
   const toggleDictation = () => {
@@ -509,8 +500,8 @@ export function OnboardingFlow({ initialProfile, onComplete }: OnboardingFlowPro
               {t.onboardCityTitle}
             </h1>
 
-            <div className="grid grid-cols-3 gap-2">
-              {(['patiala', 'chandigarh', 'new-delhi'] as CitySlug[]).map((slug) => {
+            <div className="grid grid-cols-1 gap-2">
+              {(['patiala'] as CitySlug[]).map((slug) => {
                 const active = draft.city === slug;
                 return (
                   <button

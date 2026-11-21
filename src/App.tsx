@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   BookOpen,
-  Camera,
   Home,
   ListChecks,
   Route,
   SlidersHorizontal,
+  Users,
   WifiOff,
 } from 'lucide-react';
-import { INITIAL_ISSUES, INITIAL_PLACES } from './data/mockSugamData';
+import { useCampusData } from './hooks/useCampusData';
+import { snapBarriers } from './lib/campusRouter';
+import { placeRowToPlace } from './lib/campusPlaces';
+import { CAMPUS_STRINGS } from './components/campus/strings';
 import { ISSUE_TRANSLATIONS, localizePlaceName, STRINGS } from './lib/i18n';
 import type { SamplePhotoKey } from './lib/mockPhotoAudit';
 import type { ScoringResult } from './lib/scoring';
@@ -25,6 +28,7 @@ import { PreferencesModal } from './components/PreferencesModal';
 import { TravellerApp, type TravellerTab } from './components/TravellerApp';
 import { AuditorConsole, type AuditorTab } from './components/AuditorConsole';
 import { stopSpeaking } from './lib/safety/device';
+import { AccountButton, AuthSheet } from './components/auth/AuthSheet';
 
 const STORAGE_KEY = 'sugampath_user_v1';
 
@@ -46,7 +50,8 @@ function loadSavedProfile(): UserProfile {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_PROFILE;
     const parsed = JSON.parse(raw) as Partial<UserProfile>;
-    return { ...DEFAULT_PROFILE, ...parsed };
+    // Pilot: Thapar University (Patiala) only.
+    return { ...DEFAULT_PROFILE, ...parsed, city: 'patiala' };
   } catch {
     return DEFAULT_PROFILE;
   }
@@ -57,8 +62,22 @@ export default function App() {
   const [travellerTab, setTravellerTab] = useState<TravellerTab>('home');
   const [auditorTab, setAuditorTab] = useState<AuditorTab>('fixlist');
 
-  const [places, setPlaces] = useState<Place[]>(INITIAL_PLACES);
-  const [issues, setIssues] = useState<AuditIssue[]>(INITIAL_ISSUES);
+  // Thapar campus places, live from Supabase. Scores come from the real paths + barriers around each place.
+  const campus = useCampusData();
+  const snapped = useMemo(() => snapBarriers(campus.network, campus.barriers), [campus.network, campus.barriers]);
+  const basePlaces = useMemo<Place[]>(
+    () => (campus.places ?? []).map((row) => placeRowToPlace(row, campus.network, snapped)),
+    [campus.places, campus.network, snapped]
+  );
+  // Local edits (photo audits) layered over the live rows.
+  const [edited, setEdited] = useState<Record<string, Place>>({});
+  const places = useMemo(() => basePlaces.map((p) => edited[p.id] ?? p), [basePlaces, edited]);
+  const setPlaces = (fn: (prev: Place[]) => Place[]) => {
+    const next = fn(places);
+    const changed = next.filter((p, i) => p !== places[i]);
+    if (changed.length) setEdited((prev) => ({ ...prev, ...Object.fromEntries(changed.map((p) => [p.id, p])) }));
+  };
+  const [issues, setIssues] = useState<AuditIssue[]>([]);
 
   const [reduceMotion, setReduceMotion] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
@@ -309,7 +328,7 @@ export default function App() {
       <OnboardingFlow
         initialProfile={profile}
         onComplete={(completed) => {
-          setProfile(completed);
+          setProfile({ ...completed, city: 'patiala' });
           setTravellerTab('home');
           setAuditorTab('fixlist');
         }}
@@ -320,7 +339,7 @@ export default function App() {
   const travellerTabs = [
     { id: 'home', label: t.tabHome, icon: Home },
     { id: 'route', label: t.tabBestRoute, icon: Route },
-    { id: 'photo', label: t.tabCheckPhoto, icon: Camera },
+    { id: 'community', label: t.tabCheckPhoto, icon: Users },
   ] as const;
 
   return (
@@ -400,26 +419,35 @@ export default function App() {
             )}
           </nav>
 
-          <button
-            type="button"
-            onClick={() => setPrefsOpen(true)}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[var(--border-line)] text-xs sm:text-sm font-bold text-[var(--ink-primary)] hover:bg-[var(--bg-subtle)] min-h-[40px] whitespace-nowrap shrink-0"
-          >
-            <SlidersHorizontal className="w-4 h-4 shrink-0" aria-hidden="true" />
-            <span>{t.preferencesTitle}</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <AccountButton language={profile.language} />
+            <button
+              type="button"
+              onClick={() => setPrefsOpen(true)}
+              aria-label={t.preferencesTitle}
+              className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-2 rounded-xl border border-[var(--border-line)] text-xs sm:text-sm font-bold text-[var(--ink-primary)] hover:bg-[var(--bg-subtle)] min-h-[40px] whitespace-nowrap shrink-0"
+            >
+              <SlidersHorizontal className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span className="hidden sm:inline">{t.preferencesTitle}</span>
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Content with Generous Negative Space */}
       <main id="main-content" className="flex-1 w-full pb-20 md:pb-10">
-        {profile.role === 'traveller' ? (
+        {places.length === 0 ? (
+          <div role="status" className="p-10 text-center text-sm font-semibold text-[var(--ink-secondary)]">
+            {campus.placesStatus === 'error' ? campus.placesError : CAMPUS_STRINGS[profile.language].loading}
+          </div>
+        ) : profile.role === 'traveller' ? (
           <TravellerApp
             tab={travellerTab}
             onTabChange={changeTravellerTab}
             places={places}
             city={profile.city}
             mode={profile.mode}
+            onModeChange={(mode) => updateProfile({ mode })}
             language={profile.language}
             voiceEnabled={profile.voiceEnabled}
             visualOnly={profile.visualOnly}
@@ -506,6 +534,8 @@ export default function App() {
           </div>
         )}
       </nav>
+
+      <AuthSheet language={profile.language} />
 
       {/* Settings & Replay Welcome Guide Modal */}
       <PreferencesModal
