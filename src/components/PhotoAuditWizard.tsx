@@ -1,4 +1,4 @@
-import { aiAudit, type AiAuditOut } from '../lib/aiClient';
+import { aiAudit, lastAiError, type AiAuditOut } from '../lib/aiClient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
@@ -1085,6 +1085,7 @@ export function PhotoAuditWizard({
           {aiFailed ? (
             <div role="alert" className="p-4 rounded-2xl bg-[var(--status-red-soft)] border border-[var(--status-red)]/30 space-y-3">
               <p className="text-sm font-bold text-[var(--ink-primary)]">{t.photoAiFailed}</p>
+              {lastAiError && <p className="text-xs text-[var(--ink-secondary)] break-words">{lastAiError}</p>}
               <button
                 type="button"
                 onClick={() => startOnlineAnalysis()}

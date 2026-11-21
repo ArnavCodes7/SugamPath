@@ -1,4 +1,4 @@
-import { askVision, readBody, LANG_NAME } from './_ai';
+import { askVision, readBody, LANG_NAME } from './_ai.js';
 
 export const config = { maxDuration: 40 };
 

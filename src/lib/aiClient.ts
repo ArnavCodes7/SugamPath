@@ -23,6 +23,8 @@ export interface AiAuditOut {
   processing_ms: number;
 }
 
+export let lastAiError = '';
+
 export async function aiAudit(args: {
   photoUrl: string;
   subject: string;
@@ -37,7 +39,12 @@ export async function aiAudit(args: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...args, imageDataUrl, photoUrl: undefined }),
     });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      lastAiError = `${r.status} ${e?.error ?? ''}`.trim();
+      return null;
+    }
+    lastAiError = '';
     const d = (await r.json()) as AiAuditOut;
     const f = d.findings;
     if (!f || typeof f.ai_confidence !== 'number') return null;
@@ -49,7 +56,8 @@ export async function aiAudit(args: {
     f.uncertainty_notes ??= '';
     f.scene ??= '';
     return d;
-  } catch {
+  } catch (e) {
+    lastAiError = String((e as Error)?.message ?? e);
     return null;
   }
 }
