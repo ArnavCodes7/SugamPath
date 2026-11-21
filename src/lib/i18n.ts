@@ -275,6 +275,11 @@ export interface AppStrings {
   photoGoOnlineBtn: string;
   photoQueuedCountLabel: string;
   photoCheckedByAiDemo: string;
+  photoCheckedByAiLive: string;
+  photoAiSawTitle: string;
+  photoAiFailed: string;
+  photoRetryBtn: string;
+  photoMeaningFor: string;
   photoSureLabel: string;
   photoUnclearNotice: string;
   photoFindingsTitle: string;
@@ -635,6 +640,11 @@ export const STRINGS: Record<LanguageCode, AppStrings> = {
     photoGoOnlineBtn: 'Go back online & check now',
     photoQueuedCountLabel: 'Saved on phone:',
     photoCheckedByAiDemo: 'Checked by AI (Demo)',
+    photoCheckedByAiLive: 'Checked by Gemini AI',
+    photoAiSawTitle: 'What AI saw',
+    photoAiFailed: 'AI could not check this photo. Please try again.',
+    photoRetryBtn: 'Try again',
+    photoMeaningFor: 'For {mode}',
     photoSureLabel: 'Sure:',
     photoUnclearNotice: 'Photo is not clear. Score was not changed.',
     photoFindingsTitle: 'What we saw',
@@ -1026,6 +1036,11 @@ export const STRINGS: Record<LanguageCode, AppStrings> = {
     photoGoOnlineBtn: 'ऑनलाइन जाएं और अभी जांचें',
     photoQueuedCountLabel: 'फ़ोन में सेव:',
     photoCheckedByAiDemo: 'AI द्वारा जांचा गया (डेमो)',
+    photoCheckedByAiLive: 'Gemini AI ने जांचा',
+    photoAiSawTitle: 'AI ने क्या देखा',
+    photoAiFailed: 'AI इस फ़ोटो को नहीं जांच सका। कृपया दोबारा कोशिश करें।',
+    photoRetryBtn: 'दोबारा कोशिश करें',
+    photoMeaningFor: '{mode} के लिए',
     photoSureLabel: 'भरोसा:',
     photoUnclearNotice: 'फ़ोटो साफ नहीं है। स्कोर नहीं बदला गया।',
     photoFindingsTitle: 'हमने क्या देखा',
@@ -1417,6 +1432,11 @@ export const STRINGS: Record<LanguageCode, AppStrings> = {
     photoGoOnlineBtn: 'ਆਨਲਾਈਨ ਜਾਓ ਅਤੇ ਹੁਣੇ ਜਾਂਚੋ',
     photoQueuedCountLabel: 'ਫ਼ੋਨ ਤੇ ਸੇਵ:',
     photoCheckedByAiDemo: 'AI ਵੱਲੋਂ ਜਾਂਚਿਆ (ਡੈਮੋ)',
+    photoCheckedByAiLive: 'Gemini AI ਨੇ ਜਾਂਚਿਆ',
+    photoAiSawTitle: 'AI ਨੇ ਕੀ ਦੇਖਿਆ',
+    photoAiFailed: 'AI ਇਹ ਫ਼ੋਟੋ ਨਹੀਂ ਜਾਂਚ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।',
+    photoRetryBtn: 'ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ',
+    photoMeaningFor: '{mode} ਲਈ',
     photoSureLabel: 'ਭਰੋਸਾ:',
     photoUnclearNotice: 'ਫ਼ੋਟੋ ਸਾਫ਼ ਨਹੀਂ ਹੈ। ਸਕੋਰ ਨਹੀਂ ਬਦਲਿਆ ਗਿਆ।',
     photoFindingsTitle: 'ਅਸੀਂ ਕੀ ਦੇਖਿਆ',

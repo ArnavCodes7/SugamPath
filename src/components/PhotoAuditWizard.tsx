@@ -1,10 +1,8 @@
 import { aiAudit, type AiAuditOut } from '../lib/aiClient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Accessibility,
   AlertTriangle,
   ArrowLeftRight,
-  ArrowUpDown,
   Bus,
   Camera,
   CheckCircle2,
@@ -36,7 +34,7 @@ import {
   type PhotoAuditSubject,
   type SamplePhotoKey,
 } from '../lib/mockPhotoAudit';
-import { computeDeterministicScores, type ScoringResult } from '../lib/scoring';
+import { computeDeterministicScores, getScoreTier, type ScoringResult } from '../lib/scoring';
 import type {
   AuditFindings,
   CitySlug,
@@ -44,7 +42,7 @@ import type {
   Place,
   TravelMode,
 } from '../types/sugampath';
-import { ScoreBadge, TrustLabelText } from './ScoreBadge';
+import { TrustLabelText } from './ScoreBadge';
 
 interface PhotoAuditWizardProps {
   places: Place[];
@@ -118,6 +116,8 @@ export function PhotoAuditWizard({
   const [offlineQueue, setOfflineQueue] = useState<OfflinePendingAudit[]>(loadOfflineAuditQueue);
   const [savedQueueId, setSavedQueueId] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiFailed, setAiFailed] = useState(false);
+  const [isLiveResult, setIsLiveResult] = useState(false);
 
   // Step 4 state
   const [result, setResult] = useState<ScoringResult | null>(null);
@@ -336,6 +336,8 @@ export function PhotoAuditWizard({
 
     setFindings(computedFindings);
     setResult(computedScores);
+    setIsLiveResult(!sampleMatch && !!ai);
+    setAiFailed(false);
     setIsAnalyzing(false);
 
     if (queueIdToRemove) {
@@ -371,6 +373,7 @@ export function PhotoAuditWizard({
   const startOnlineAnalysis = (queueItem?: OfflinePendingAudit) => {
     if (analyzeTimerRef.current) window.clearTimeout(analyzeTimerRef.current);
     setIsAnalyzing(true);
+    setAiFailed(false);
 
     const usedPhoto = queueItem?.photoUrl || photoUrl || MOCK_AUDIT_SAMPLES[0].photo;
     const usedPlaceId = queueItem?.placeId || targetPlace.id;
@@ -400,7 +403,15 @@ export function PhotoAuditWizard({
         note: usedNote,
         placeName: usedPlaceName,
         language,
-      }).then(done);
+      }).then((ai) => {
+        if (ai) {
+          done(ai);
+        } else {
+          // Real photo: never show invented results when the AI call fails.
+          setIsAnalyzing(false);
+          setAiFailed(true);
+        }
+      });
     }
   };
 
@@ -450,6 +461,7 @@ export function PhotoAuditWizard({
       analyzeTimerRef.current = null;
     }
     setIsAnalyzing(false);
+    setAiFailed(false);
     setStep(2);
   };
 
@@ -467,6 +479,7 @@ export function PhotoAuditWizard({
     setResult(null);
     setFindings(null);
     setIsAnalyzing(false);
+    setAiFailed(false);
     setSavedQueueId(null);
     setHasReportedForRun(false);
     setStep(1);
@@ -629,7 +642,13 @@ export function PhotoAuditWizard({
       .slice(0, 3)
       .map((c) => c.text)
       .join('. ');
-    return `${labelTxt}. ${t.modes[mode]}: ${modeScore} ${t.outOf100}. ${chips}.`;
+    return `${f.scene ? f.scene + ' ' : ''}${labelTxt}. ${t.modes[mode]}: ${modeScore} ${t.outOf100}. ${chips}.`;
+  };
+
+  const modeFindingKinds: Record<'wheelchair' | 'blind' | 'walker', FindingChipItem['kind'][]> = {
+    wheelchair: ['blur', 'stepFree', 'ramp', 'lift', 'obstruction'],
+    walker: ['blur', 'stepFree', 'ramp', 'lift', 'obstruction'],
+    blind: ['blur', 'tactile', 'obstruction', 'signal'],
   };
 
   const modeCardsOrder = useMemo(() => {
@@ -1060,7 +1079,19 @@ export function PhotoAuditWizard({
             />
           )}
 
-          {isOffline && !isAnalyzing ? (
+          {aiFailed ? (
+            <div role="alert" className="p-4 rounded-2xl bg-[var(--status-red-soft)] border border-[var(--status-red)]/30 space-y-3">
+              <p className="text-sm font-bold text-[var(--ink-primary)]">{t.photoAiFailed}</p>
+              <button
+                type="button"
+                onClick={() => startOnlineAnalysis()}
+                className="w-full py-3.5 px-5 rounded-2xl bg-[var(--ink-primary)] text-[var(--bg-surface)] text-base font-bold flex items-center justify-center gap-2 min-h-[50px]"
+              >
+                <RotateCcw className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>{t.photoRetryBtn}</span>
+              </button>
+            </div>
+          ) : isOffline && !isAnalyzing ? (
             <div className="p-4 rounded-2xl bg-[var(--tactile-yellow-soft)] border-2 border-[var(--ink-primary)] space-y-4">
               <div className="flex items-start gap-3">
                 <WifiOff className="w-6 h-6 text-[var(--ink-primary)] shrink-0 mt-0.5" aria-hidden="true" />
@@ -1156,11 +1187,12 @@ export function PhotoAuditWizard({
                   </span>
                 )}
               </div>
+              <h3 className="text-xs font-bold text-[var(--ink-secondary)]">{t.photoAiSawTitle}</h3>
               <p className="text-sm font-bold text-[var(--ink-primary)] leading-snug">
                 {selectedSample ? t.photoSamples[selectedSample.key].scene : findings.scene}
               </p>
               <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--ink-secondary)]">
-                <span>{t.photoCheckedByAiDemo}</span>
+                <span>{isLiveResult ? t.photoCheckedByAiLive : t.photoCheckedByAiDemo}</span>
                 <span aria-hidden="true">·</span>
                 <span className="font-mono-tabular font-bold text-[var(--ink-primary)]">
                   {t.photoSureLabel} {Math.round(result.final_confidence * 100)}%
@@ -1180,65 +1212,66 @@ export function PhotoAuditWizard({
             </div>
           )}
 
-          {/* Mode Scores (Active Mode Highlighted First) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {/* Per-mode score merged with what the photo shows for that mode */}
+          <div className="space-y-2.5">
             {modeCardsOrder.map((card) => {
               const isPrimary = card.key === mode;
               const shownScore = result.label === 'not_verified' ? null : card.score;
+              const tier = getScoreTier(shownScore);
+              const notes = buildFindingChips(findings).filter((c) =>
+                modeFindingKinds[card.key].includes(c.kind)
+              );
               return (
                 <div
                   key={card.key}
-                  className={`p-3.5 rounded-2xl space-y-1.5 ${
+                  className={`p-4 rounded-2xl space-y-3 ${
                     isPrimary
                       ? 'bg-[var(--tactile-yellow-soft)] border-2 border-[var(--ink-primary)]'
                       : 'bg-[var(--bg-paper)] border border-[var(--border-line)]'
                   }`}
                 >
-                  <div className="text-xs font-bold text-[var(--ink-secondary)]">{card.label}</div>
-                  <ScoreBadge score={shownScore} language={language} size="md" />
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-bold text-[var(--ink-primary)]">
+                      {t.photoMeaningFor.replace('{mode}', card.label)}
+                    </div>
+                    <div
+                      className="font-mono-tabular font-bold text-lg whitespace-nowrap"
+                      style={{ color: tier.colorVar }}
+                      aria-label={`${shownScore ?? 0} ${t.outOf100}`}
+                    >
+                      {shownScore ?? '--'}
+                      <span className="text-xs font-semibold text-[var(--ink-secondary)]"> / 100</span>
+                    </div>
+                  </div>
+                  <div className="h-2 rounded-full bg-[var(--bg-subtle)] overflow-hidden" aria-hidden="true">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${shownScore ?? 0}%`, backgroundColor: tier.colorVar }}
+                    />
+                  </div>
+                  <ul className="space-y-1.5">
+                    {notes.map((item) => {
+                      const Icon =
+                        item.tone === 'good' ? CheckCircle2 : item.tone === 'neutral' ? Eye : AlertTriangle;
+                      const color =
+                        item.tone === 'good'
+                          ? 'var(--status-good)'
+                          : item.tone === 'bad'
+                            ? 'var(--status-red)'
+                            : item.tone === 'warn'
+                              ? 'var(--status-amber)'
+                              : 'var(--ink-secondary)';
+                      return (
+                        <li key={item.id} className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-[var(--ink-primary)]">
+                          <Icon className="w-4 h-4 shrink-0" style={{ color }} aria-hidden="true" />
+                          <span>{item.text}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               );
             })}
-          </div>
-
-          {/* Short Findings List (Icon + 3-5 words, honest Unknowns) */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-bold text-[var(--ink-secondary)]">
-              {t.photoFindingsTitle}
-            </h3>
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {buildFindingChips(findings).map((item) => {
-                const Icon =
-                  item.kind === 'stepFree'
-                    ? Accessibility
-                    : item.kind === 'ramp'
-                      ? Footprints
-                      : item.kind === 'lift'
-                        ? ArrowUpDown
-                        : item.kind === 'tactile'
-                          ? Eye
-                          : AlertTriangle;
-
-                const boxColor =
-                  item.tone === 'good'
-                    ? 'bg-[var(--status-good-soft)] border-[var(--status-good)]/30 text-[var(--ink-primary)]'
-                    : item.tone === 'bad'
-                      ? 'bg-[var(--status-red-soft)] border-[var(--status-red)]/30 text-[var(--ink-primary)]'
-                      : item.tone === 'warn'
-                        ? 'bg-[var(--status-amber-soft)] border-[var(--status-amber)]/30 text-[var(--ink-primary)]'
-                        : 'bg-[var(--bg-paper)] border-[var(--border-line)] text-[var(--ink-secondary)]';
-
-                return (
-                  <li
-                    key={item.id}
-                    className={`px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-bold flex items-center gap-2 ${boxColor}`}
-                  >
-                    <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
-                    <span>{item.text}</span>
-                  </li>
-                );
-              })}
-            </ul>
           </div>
 
           {/* Live Place Update & City Issue Confirmation */}
