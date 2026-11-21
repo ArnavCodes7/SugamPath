@@ -80,9 +80,10 @@ export default function App() {
     root.lang = profile.language;
     root.classList.toggle('dark', profile.highContrast);
     root.classList.remove('text-scale-lg', 'text-scale-xl');
-    if (profile.bigText) root.classList.add('text-scale-lg');
+    if (profile.xlText) root.classList.add('text-scale-xl');
+    else if (profile.bigText) root.classList.add('text-scale-lg');
     root.classList.toggle('reduce-motion', reduceMotion);
-  }, [profile.language, profile.highContrast, profile.bigText, reduceMotion]);
+  }, [profile.language, profile.highContrast, profile.bigText, profile.xlText, reduceMotion]);
 
   useEffect(() => {
     const onOnline = () => setIsOffline(false);

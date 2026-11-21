@@ -1,3 +1,4 @@
+import { aiAudit, type AiAuditOut } from '../lib/aiClient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Accessibility,
@@ -285,6 +286,22 @@ export function PhotoAuditWizard({
       setMicListening(false);
       return;
     }
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SR) {
+      const rec = new SR();
+      rec.lang = language === 'hi' ? 'hi-IN' : language === 'pa' ? 'pa-IN' : 'en-IN';
+      rec.interimResults = false;
+      rec.onresult = (e: any) => setNote((n) => (n ? n + ' ' : '') + e.results[0][0].transcript);
+      rec.onend = () => setMicListening(false);
+      rec.onerror = () => setMicListening(false);
+      setMicListening(true);
+      try {
+        rec.start();
+        return;
+      } catch {
+        setMicListening(false);
+      }
+    }
     setMicListening(true);
     micTimerRef.current = window.setTimeout(() => {
       const sampleText = t.photoMockMicNotes[micMockIdx % t.photoMockMicNotes.length];
@@ -302,7 +319,8 @@ export function PhotoAuditWizard({
     usedSubject: PhotoAuditSubject,
     usedNote: string,
     usedSampleKey: SamplePhotoKey | null,
-    queueIdToRemove?: string | null
+    queueIdToRemove?: string | null,
+    ai?: AiAuditOut | null
   ) => {
     const sampleMatch = usedSampleKey
       ? MOCK_AUDIT_SAMPLES.find((s) => s.key === usedSampleKey)
@@ -310,6 +328,8 @@ export function PhotoAuditWizard({
 
     const computedFindings: AuditFindings = sampleMatch
       ? sampleMatch.findings
+      : ai
+      ? ai.findings
       : buildMockFindingsFromUpload(usedSubject, usedNote, usedPlaceName);
 
     const computedScores = computeDeterministicScores(computedFindings);
@@ -360,7 +380,7 @@ export function PhotoAuditWizard({
     const usedNote = queueItem?.note ?? note;
     const usedSampleKey = queueItem ? queueItem.sampleKey || null : selectedSampleKey;
 
-    analyzeTimerRef.current = window.setTimeout(() => {
+    const done = (ai: AiAuditOut | null) =>
       finalizeAnalysis(
         usedPhoto,
         usedPlaceId,
@@ -368,9 +388,20 @@ export function PhotoAuditWizard({
         usedSubject,
         usedNote,
         usedSampleKey,
-        queueItem?.id || savedQueueId
+        queueItem?.id || savedQueueId,
+        ai
       );
-    }, 1500);
+    if (usedSampleKey) {
+      analyzeTimerRef.current = window.setTimeout(() => done(null), 1500);
+    } else {
+      void aiAudit({
+        photoUrl: usedPhoto,
+        subject: usedSubject,
+        note: usedNote,
+        placeName: usedPlaceName,
+        language,
+      }).then(done);
+    }
   };
 
   const handleBeginCheck = () => {

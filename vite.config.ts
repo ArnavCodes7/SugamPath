@@ -2,12 +2,38 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, loadEnv} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
 
-export default defineConfig(() => {
+export default defineConfig(({mode}) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  for (const k of ['GEMINI_API_KEY', 'GROQ_API_KEY']) if (env[k]) process.env[k] = env[k];
   return {
+    envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
     plugins: [
+      {
+        // Serve ./api/*.ts in `vite dev` the same way Vercel does in production.
+        name: 'dev-api',
+        apply: 'serve',
+        configureServer(server: any) {
+          server.middlewares.use(async (req: any, res: any, next: () => void) => {
+            const m = /^\/api\/([\w-]+)/.exec(req.url || '');
+            if (!m) return next();
+            try {
+              const mod = await server.ssrLoadModule(`/api/${m[1]}.ts`);
+              res.status = (c: number) => ((res.statusCode = c), res);
+              res.json = (o: unknown) => {
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify(o));
+              };
+              await mod.default(req, res);
+            } catch (e) {
+              res.statusCode = 500;
+              res.end(String(e));
+            }
+          });
+        },
+      },
       react(),
       tailwindcss(),
       VitePWA({
@@ -45,6 +71,7 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
+          navigateFallbackDenylist: [/^\/api\//],
           globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,woff,woff2}'],
           runtimeCaching: [
             {

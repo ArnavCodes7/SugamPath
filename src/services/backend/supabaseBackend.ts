@@ -1,4 +1,5 @@
 import type { HazardReport, LegalReportRecord, SugamBackend, SurroundingsRequest } from './types';
+import { createLocalBackend } from './localBackend';
 import type { SosEvent, SurfaceSample, SurroundingsResult, TripState, ArrivalCheckInput } from '../../types/safety';
 
 /**
@@ -38,6 +39,7 @@ export interface SupabaseLike {
   };
   channel(name: string): SbChannel;
   removeChannel(ch: SbChannel): unknown;
+  rpc(fn: string, args: Record<string, unknown>): PromiseLike<SbResult<any>>;
   functions: { invoke(name: string, opts: { body: unknown }): PromiseLike<SbResult<any>> };
 }
 
@@ -48,7 +50,7 @@ const must = (r: SbResult) => {
 export function createSupabaseBackend(sb: SupabaseLike): SugamBackend {
   /** Trip rows hold the whole TripState as JSON. Realtime fan-out uses a broadcast channel per token. */
   const persist = async (trip: TripState) => {
-    must(await sb.from('trips').upsert({ token: trip.token, state: trip, updated_at: new Date(trip.updatedAt).toISOString() }));
+    must(await sb.rpc('put_trip', { p_token: trip.token, p_state: trip }));
   };
 
   const channels = new Map<string, SbChannel>();
@@ -60,13 +62,18 @@ export function createSupabaseBackend(sb: SupabaseLike): SugamBackend {
     }
     return ch;
   };
-  const broadcast = (trip: TripState) =>
-    sender(trip.token).send({ type: 'broadcast', event: 'trip', payload: trip });
+  const broadcast = async (trip: TripState) => {
+    try {
+      await sender(trip.token).send({ type: 'broadcast', event: 'trip', payload: trip });
+    } catch {
+      // best effort; followers also poll
+    }
+  };
 
   const get = async (token: string): Promise<TripState | null> => {
-    const r = await sb.from('trips').select('state').eq('token', token).maybeSingle();
+    const r = await sb.rpc('get_trip', { p_token: token });
     if (r.error) throw new Error(r.error.message);
-    return (r.data?.state as TripState) ?? null;
+    return (r.data as TripState) ?? null;
   };
 
   // Merge-then-persist keeps the row authoritative even if two writers race.
@@ -98,16 +105,25 @@ export function createSupabaseBackend(sb: SupabaseLike): SugamBackend {
     getTrip: get,
 
     subscribeTrip(token, onChange) {
-      void get(token).then((t) => t && onChange(t)).catch(() => {});
+      let last = 0;
+      const push = (t: TripState | null) => {
+        if (t && (t.updatedAt ?? 0) >= last) {
+          last = t.updatedAt ?? 0;
+          onChange(t);
+        }
+      };
+      const poll = () => void get(token).then(push).catch(() => {});
+      poll();
+      const timer = setInterval(poll, 3000);
       const ch = sb
-        .channel(`trip:${token}`)
-        .on('broadcast', { event: 'trip' }, (msg) => msg.payload && onChange(msg.payload as TripState))
+        .channel(`trip-follow:${token}`)
+        .on('broadcast', { event: 'trip' }, (msg) => msg.payload && push(msg.payload as TripState))
         .subscribe();
       return () => {
+        clearInterval(timer);
         sb.removeChannel(ch);
       };
     },
-
     async submitSurfaceSamples(samples: SurfaceSample[]) {
       must(
         await sb
@@ -146,11 +162,8 @@ export function createSupabaseBackend(sb: SupabaseLike): SugamBackend {
       );
     },
 
-    /** Expects an Edge Function "whats-ahead" that calls Gemini/Groq. See docs/BACKEND.md for the contract. */
-    async analyzeSurroundings(req: SurroundingsRequest): Promise<SurroundingsResult> {
-      const r = await sb.functions.invoke('whats-ahead', { body: req });
-      if (r.error || !r.data) throw new Error(r.error?.message ?? 'No response');
-      return r.data as SurroundingsResult;
-    },
+    /** Served by the Vercel function /api/whats-ahead (Gemini, Groq fallback). */
+    analyzeSurroundings: (req: SurroundingsRequest): Promise<SurroundingsResult> =>
+      createLocalBackend().analyzeSurroundings(req),
   };
 }

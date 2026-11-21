@@ -164,6 +164,18 @@ export function PreferencesModal({
 
             <button
               type="button"
+              onClick={() => onUpdateProfile({ xlText: !profile.xlText })}
+              aria-pressed={!!profile.xlText}
+              className={`px-3 py-2.5 rounded-xl border text-xs font-bold min-h-[44px] ${
+                profile.xlText
+                  ? 'bg-[var(--tactile-yellow-soft)] border-[var(--ink-primary)] text-[var(--ink-primary)]'
+                  : 'bg-[var(--bg-paper)] border-[var(--border-line)] text-[var(--ink-primary)]'
+              }`}
+            >
+              {t.onboardBigText} ++: {profile.xlText ? t.on : t.off}
+            </button>
+            <button
+              type="button"
               onClick={() => onUpdateProfile({ highContrast: !profile.highContrast })}
               aria-pressed={profile.highContrast}
               className={`px-3 py-2.5 rounded-xl border text-xs font-bold min-h-[44px] ${

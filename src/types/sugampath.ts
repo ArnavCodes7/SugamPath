@@ -11,6 +11,7 @@ export interface UserProfile {
   mode: TravelMode;
   city: CitySlug;
   bigText: boolean;
+  xlText?: boolean;
   voiceEnabled: boolean;
   highContrast: boolean;
   visualOnly?: boolean;

@@ -100,15 +100,16 @@ export function createLocalBackend(): SugamBackend {
     async recordLegalReport() {},
 
     async analyzeSurroundings(req): Promise<SurroundingsResult> {
-      const base = import.meta.env.VITE_API_BASE as string | undefined;
-      if (base) {
+      const base = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
+      try {
         const res = await fetch(`${base.replace(/\/$/, '')}/api/whats-ahead`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: req.imageDataUrl, language: req.language, placeId: req.placeId }),
+          body: JSON.stringify({ imageDataUrl: req.imageDataUrl, language: req.language, placeId: req.placeId }),
         });
-        if (!res.ok) throw new Error(`whats-ahead ${res.status}`);
-        return (await res.json()) as SurroundingsResult;
+        if (res.ok) return (await res.json()) as SurroundingsResult;
+      } catch {
+        // fall through to sample reply
       }
       // Sample reply so the flow is demonstrable without an AI key.
       await new Promise((r) => setTimeout(r, 900));

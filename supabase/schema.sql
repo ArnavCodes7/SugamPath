@@ -51,19 +51,27 @@ alter table arrival_checks   enable row level security;
 alter table legal_reports    enable row level security;
 
 -- Anonymous devices may write. Reads of trips go through get_trip(token) so rows cannot be listed.
-create policy "anon insert samples"  on surface_samples for insert to anon with check (true);
-create policy "anon insert hazards"  on hazard_reports  for insert to anon with check (true);
-create policy "anon read hazards"    on hazard_reports  for select to anon using (at > now() - interval '30 days');
+drop policy if exists "anon insert samples" on surface_samples;
+create policy "anon insert samples" on surface_samples for insert to anon with check (true);
+drop policy if exists "anon insert hazards" on hazard_reports;
+create policy "anon insert hazards" on hazard_reports  for insert to anon with check (true);
+drop policy if exists "anon read hazards" on hazard_reports;
+create policy "anon read hazards" on hazard_reports  for select to anon using (at > now() - interval '30 days');
+drop policy if exists "anon insert arrivals" on arrival_checks;
 create policy "anon insert arrivals" on arrival_checks  for insert to anon with check (true);
-create policy "anon insert reports"  on legal_reports   for insert to anon with check (true);
-create policy "anon upsert trips"    on trips for insert to anon with check (true);
-create policy "anon update trips"    on trips for update to anon using (true) with check (true);
+drop policy if exists "anon insert reports" on legal_reports;
+create policy "anon insert reports" on legal_reports   for insert to anon with check (true);
 
 create or replace function get_trip(p_token text) returns jsonb
 language sql security definer set search_path = public as
 $$ select state from trips where token = p_token $$;
 grant execute on function get_trip(text) to anon;
 
+create or replace function put_trip(p_token text, p_state jsonb) returns void
+language sql security definer set search_path = public as
+$$ insert into trips (token, state, updated_at) values (p_token, p_state, now())
+   on conflict (token) do update set state = excluded.state, updated_at = now() $$;
+grant execute on function put_trip(text, jsonb) to anon;
 -- Realtime: the app uses Broadcast channels named "trip:<token>", which need no table publication.
 -- TODO before launch: restrict "anon update trips" (e.g. require the writer to present the token via an RPC)
 -- and add a cron job deleting trips older than 24 h.
