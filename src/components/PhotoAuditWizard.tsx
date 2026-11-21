@@ -143,6 +143,9 @@ export function PhotoAuditWizard({
       if (analyzeTimerRef.current) window.clearTimeout(analyzeTimerRef.current);
       if (micTimerRef.current) window.clearTimeout(micTimerRef.current);
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
     };
   }, []);
 

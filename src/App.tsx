@@ -24,6 +24,7 @@ import { OnboardingFlow } from './components/OnboardingFlow';
 import { PreferencesModal } from './components/PreferencesModal';
 import { TravellerApp, type TravellerTab } from './components/TravellerApp';
 import { AuditorConsole, type AuditorTab } from './components/AuditorConsole';
+import { stopSpeaking } from './lib/safety/device';
 
 const STORAGE_KEY = 'sugampath_user_v1';
 
@@ -95,6 +96,33 @@ export default function App() {
       window.removeEventListener('offline', onOffline);
     };
   }, []);
+
+  // Speech belongs to the current screen. Stop it when the page is hidden or left.
+  useEffect(() => {
+    const stopForPageChange = () => stopSpeaking();
+    document.addEventListener('visibilitychange', stopForPageChange);
+    window.addEventListener('pagehide', stopForPageChange);
+    window.addEventListener('blur', stopForPageChange);
+    return () => {
+      document.removeEventListener('visibilitychange', stopForPageChange);
+      window.removeEventListener('pagehide', stopForPageChange);
+      window.removeEventListener('blur', stopForPageChange);
+      stopSpeaking();
+    };
+  }, []);
+
+  const changeTravellerTab = (tab: TravellerTab) => {
+    stopSpeaking();
+    setTravellerTab(tab);
+  };
+  const changeAuditorTab = (tab: AuditorTab) => {
+    stopSpeaking();
+    setAuditorTab(tab);
+  };
+  const openPreferences = () => {
+    stopSpeaking();
+    setPrefsOpen(true);
+  };
 
   const updateProfile = (patch: Partial<UserProfile>) => {
     setProfile((prev) => ({ ...prev, ...patch }));
@@ -335,7 +363,7 @@ export default function App() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setTravellerTab(item.id)}
+                  onClick={() => changeTravellerTab(item.id)}
                   aria-current={travellerTab === item.id ? 'page' : undefined}
                   className={`py-1.5 whitespace-nowrap shrink-0 transition-colors border-b-2 ${
                     travellerTab === item.id
@@ -357,7 +385,7 @@ export default function App() {
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setAuditorTab(item.id)}
+                    onClick={() => changeAuditorTab(item.id)}
                     aria-current={auditorTab === item.id ? 'page' : undefined}
                     className={`py-1.5 whitespace-nowrap shrink-0 transition-colors border-b-2 ${
                       auditorTab === item.id
@@ -388,7 +416,7 @@ export default function App() {
         {profile.role === 'traveller' ? (
           <TravellerApp
             tab={travellerTab}
-            onTabChange={setTravellerTab}
+            onTabChange={changeTravellerTab}
             places={places}
             city={profile.city}
             mode={profile.mode}
@@ -397,7 +425,7 @@ export default function App() {
             visualOnly={profile.visualOnly}
             isOffline={isOffline}
             onToggleOffline={() => setIsOffline((v) => !v)}
-            onOpenPreferences={() => setPrefsOpen(true)}
+            onOpenPreferences={openPreferences}
             emergencyContact={profile.emergencyContact ?? null}
             passiveMapping={profile.passiveMapping !== false}
             onSaveContact={(c) => updateProfile({ emergencyContact: c })}
@@ -408,7 +436,7 @@ export default function App() {
         ) : (
           <AuditorConsole
             tab={auditorTab}
-            onTabChange={setAuditorTab}
+            onTabChange={changeAuditorTab}
             issues={issues}
             places={places}
             defaultCity={profile.city}
@@ -434,7 +462,7 @@ export default function App() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setTravellerTab(item.id)}
+                  onClick={() => changeTravellerTab(item.id)}
                   aria-current={active ? 'page' : undefined}
                   className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${
                     active
@@ -462,7 +490,7 @@ export default function App() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setAuditorTab(item.id)}
+                  onClick={() => changeAuditorTab(item.id)}
                   aria-current={active ? 'page' : undefined}
                   className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${
                     active

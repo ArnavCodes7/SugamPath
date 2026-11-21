@@ -191,6 +191,9 @@ export function TravellerApp({
     setIsSpeaking(false);
   };
 
+  // Never let this screen's voice continue after the screen is replaced.
+  useEffect(() => stopSpeaking, []);
+
   const selectedPlace = places.find((p) => p.id === selectedPlaceId) || cityPlaces[0] || places[0];
   const sortedGates = useMemo(
     () => [...selectedPlace.gates].sort((a, b) => getGateScore(b, mode) - getGateScore(a, mode)),
@@ -404,6 +407,7 @@ export function TravellerApp({
   };
 
   const handleSelectStation = (place: Place) => {
+    stopSpeaking();
     setSelectedPlaceId(place.id);
     setStepFocusActive(false);
     setStepFocusIndex(0);
@@ -415,6 +419,7 @@ export function TravellerApp({
   };
 
   const handleVoiceCommand = (spokenQuery: string) => {
+    stopSpeaking();
     setMicOpen(false);
     const q = spokenQuery.toLowerCase();
 
@@ -485,6 +490,7 @@ export function TravellerApp({
     : cityPlaces;
 
   const handleViewOnMapFromAudit = (placeId: string) => {
+    stopSpeaking();
     setSelectedPlaceId(placeId);
     onFocusPlaceCity(placeId);
     setShowOptionalMap(true);
@@ -1036,7 +1042,10 @@ export function TravellerApp({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setDetailSheet('gates')}
+                  onClick={() => {
+                    stopSpeaking();
+                    setDetailSheet('gates');
+                  }}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--bg-subtle)] text-xs sm:text-sm font-bold text-[var(--ink-primary)] min-h-[42px]"
                 >
                   <ListChecks className="w-4 h-4" aria-hidden="true" />
@@ -1048,7 +1057,10 @@ export function TravellerApp({
                 {selectedPlace.nearby_buses.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setDetailSheet('buses')}
+                    onClick={() => {
+                      stopSpeaking();
+                      setDetailSheet('buses');
+                    }}
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[var(--bg-subtle)] text-xs sm:text-sm font-bold text-[var(--ink-primary)] min-h-[42px]"
                   >
                     <Bus className="w-4 h-4" aria-hidden="true" />

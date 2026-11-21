@@ -8,7 +8,7 @@ export async function askVision(prompt: string, imageDataUrl: string): Promise<{
   let lastErr: unknown = new Error('No AI key configured');
   if (gKey) {
     // Models are tried in order; 503 "high demand" is common, so each is retried once.
-    for (const model of ['gemini-flash-latest', 'gemini-3-flash-preview', 'gemini-2.5-flash-lite']) {
+    for (const model of ['gemini-4-hydrogen', 'gemini-3.8-flash', 'gemini-3.5-flash-lite']) {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${gKey}`, {
