@@ -18,7 +18,7 @@ export async function toCleanJpegDataUrl(src: string, maxSide = 1024): Promise<s
 
 export interface AiAuditOut {
   findings: AuditFindings;
-  provider: 'Gemini' | 'Groq';
+  provider: 'Gemini' | 'Groq' | 'Custom';
   model: string;
   processing_ms: number;
 }

@@ -5,13 +5,41 @@ const GEMINI_MODELS = [
   'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite',
 ];
 
-export async function askVision(prompt: string, imageDataUrl: string): Promise<{ json: any; provider: 'Gemini' | 'Groq'; model: string }> {
+export async function askVision(prompt: string, imageDataUrl: string): Promise<{ json: any; provider: 'Gemini' | 'Groq' | 'Custom'; model: string }> {
   const m = /^data:(image\/[a-z+.-]+);base64,(.+)$/i.exec(imageDataUrl);
   if (!m) throw new Error('bad image');
   const [, mime, b64] = m;
   const gKey = process.env.GEMINI_API_KEY;
   const qKey = process.env.GROQ_API_KEY;
   let lastErr: unknown = new Error('No AI key configured');
+
+  // Self-hosted / OpenAI-compatible vision model (LLM_BASE_URL, LLM_API_KEY, LLM_MODEL) goes first.
+  const cBase = process.env.LLM_BASE_URL?.replace(/\/+$/, '');
+  const cModel = process.env.LLM_MODEL;
+  if (cBase && cModel) {
+    try {
+      const r = await fetch(`${cBase}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.LLM_API_KEY ?? ''}` },
+        signal: AbortSignal.timeout(35000),
+        body: JSON.stringify({
+          model: cModel,
+          temperature: 0.1,
+          messages: [{ role: 'user', content: [{ type: 'text', text: `${prompt}\n/no_think` }, { type: 'image_url', image_url: { url: imageDataUrl } }] }],
+        }),
+      });
+      if (!r.ok) throw new Error(`custom ${cModel} ${r.status}`);
+      const d: any = await r.json();
+      let text: string = d?.choices?.[0]?.message?.content ?? '';
+      text = text.replace(/<think>[\s\S]*?<\/think>/g, '');
+      const a = text.indexOf('{');
+      const z = text.lastIndexOf('}');
+      if (a < 0 || z < a) throw new Error('custom: no JSON in reply');
+      return { json: JSON.parse(text.slice(a, z + 1)), provider: 'Custom', model: cModel };
+    } catch (e) {
+      lastErr = e; // fall through to Gemini / Groq
+    }
+  }
   if (gKey) {
     // Models are tried in order; 503 "high demand" is common, so each is retried once.
     for (const model of GEMINI_MODELS) {

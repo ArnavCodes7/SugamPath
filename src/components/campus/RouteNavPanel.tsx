@@ -1,8 +1,7 @@
-import { AlertTriangle, CheckCircle2, Navigation, ShieldCheck, Volume2, VolumeX } from 'lucide-react';
+import { Navigation, ShieldCheck, Volume2, VolumeX } from 'lucide-react';
 import type { WalkSession } from '../../hooks/useWalkSession';
-import { effortLine, SAFE } from '../../lib/i18nSafety';
+import { SAFE } from '../../lib/i18nSafety';
 import { STRINGS } from '../../lib/i18n';
-import type { EffortBreakdown } from '../../lib/safety/effort';
 import type { ActiveHazard, EmergencyContact } from '../../types/safety';
 import type { LanguageCode, RouteOption } from '../../types/sugampath';
 import { CautionList } from '../safety/CautionList';
@@ -17,11 +16,6 @@ interface Props {
   visualOnly: boolean;
   hasRoute: boolean;
   routeCompare: { standard: RouteOption; accessible: RouteOption };
-  effortStd: EffortBreakdown;
-  effortAcc: EffortBreakdown;
-  easiestIsAccessible: boolean;
-  /** Wheelchair-blocking barriers on each route. */
-  barriers: { standard: number; accessible: number };
   hazards: ActiveHazard[];
   stepFocusActive: boolean;
   stepFocusIndex: number;
@@ -39,15 +33,14 @@ interface Props {
 }
 
 /**
- * Safe Path navigation under the campus map: shortest-vs-easiest comparison, cautions, steps with
- * read-aloud, Start navigation, then the live step card with Walk-With-Me sharing and SOS.
+ * Safe Path navigation under the campus map: cautions, steps with read-aloud, Start navigation, then
+ * the live step card with Walk-With-Me sharing and SOS.
  */
 export function RouteNavPanel(p: Props) {
   const t = STRINGS[p.language];
   const S = SAFE[p.language];
   const c = CAMPUS_STRINGS[p.language];
   const steps = p.routeCompare.accessible.steps;
-  const { standard, accessible } = p.routeCompare;
 
   if (!p.hasRoute) {
     return (
@@ -60,54 +53,7 @@ export function RouteNavPanel(p: Props) {
     );
   }
 
-  const comparison = (
-    <div className="grid grid-cols-2 gap-2">
-      <div className="p-3 rounded-2xl bg-[var(--status-red-soft)] border border-[var(--status-red)]/30 space-y-1">
-        <div className="flex items-center gap-1 text-[11px] font-bold text-[var(--status-red)]">
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-          <span className="truncate">{t.shortestWay}</span>
-        </div>
-        <div className="text-base font-bold font-mono-tabular text-[var(--ink-primary)]">
-          {standard.stairs_count === 0 ? t.noStairs : `${standard.stairs_count} ${t.stairsCount}`}
-        </div>
-        {p.barriers.standard > 0 && (
-          <div className="text-xs font-bold text-[var(--status-red)]">
-            {p.barriers.standard} × {c.barrier} ({c.blocksWheelchair})
-          </div>
-        )}
-        <div className="text-[11px] text-[var(--ink-secondary)] font-mono-tabular leading-snug">
-          {effortLine(p.effortStd, p.language)}
-        </div>
-        {!p.easiestIsAccessible && (
-          <span className="inline-block px-2 py-0.5 rounded-full bg-[var(--ink-primary)] text-[var(--bg-surface)] text-[10px] font-bold">
-            {S.easiest}
-          </span>
-        )}
-      </div>
-      <div className="p-3 rounded-2xl bg-[var(--status-good-soft)] border border-[var(--status-good)]/40 space-y-1">
-        <div className="flex items-center gap-1 text-[11px] font-bold text-[var(--status-good)]">
-          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-          <span className="truncate">{t.safestWay}</span>
-        </div>
-        <div className="text-base font-bold font-mono-tabular text-[var(--ink-primary)]">
-          {accessible.stairs_count === 0 ? t.noStairs : `${accessible.stairs_count} ${t.stairsCount}`}
-        </div>
-        {p.barriers.accessible > 0 && (
-          <div className="text-xs font-bold text-[var(--status-red)]">
-            {p.barriers.accessible} × {c.barrier}
-          </div>
-        )}
-        <div className="text-[11px] text-[var(--ink-secondary)] font-mono-tabular leading-snug">
-          {accessible.duration_min} min · {effortLine(p.effortAcc, p.language)}
-        </div>
-        {p.easiestIsAccessible && (
-          <span className="inline-block px-2 py-0.5 rounded-full bg-[var(--ink-primary)] text-[var(--bg-surface)] text-[10px] font-bold">
-            {S.easiest}
-          </span>
-        )}
-      </div>
-    </div>
-  );
+  const { accessible } = p.routeCompare;
 
   const warnings = accessible.warnings.length > 0 && (
     <ul className="flex flex-wrap gap-1.5" aria-label={S.heading}>
@@ -195,10 +141,9 @@ export function RouteNavPanel(p: Props) {
     );
   }
 
-  // -------- Overview: compare, cautions, steps, Start --------
+  // -------- Overview: cautions, steps, Start --------
   return (
     <div className="space-y-3">
-      {comparison}
       <CautionList hazards={p.hazards} language={p.language} />
       {warnings}
 

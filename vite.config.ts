@@ -7,7 +7,7 @@ import {VitePWA} from 'vite-plugin-pwa';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, process.cwd(), '');
-  for (const k of ['GEMINI_API_KEY', 'GROQ_API_KEY']) if (env[k]) process.env[k] = env[k];
+  for (const k of ['GEMINI_API_KEY', 'GROQ_API_KEY', 'LLM_BASE_URL', 'LLM_API_KEY', 'LLM_MODEL']) if (env[k]) process.env[k] = env[k];
   return {
     envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
     plugins: [

@@ -47,9 +47,7 @@ import { CAMPUS_STRINGS } from './campus/strings';
 import { RouteNavPanel } from './campus/RouteNavPanel';
 import { backend } from '../services/backend';
 import { useWalkSession, type WalkRoute } from '../hooks/useWalkSession';
-import { cautionText, effortLine, SAFE } from '../lib/i18nSafety';
-import { computeEffort } from '../lib/safety/effort';
-import { useMeasuredSlope } from '../lib/safety/elevation';
+import { cautionText, SAFE } from '../lib/i18nSafety';
 import { getActiveHazards, HAZARDS_CHANGED_EVENT, reportHazardLocal } from '../lib/safety/hazards';
 import { loadActiveTrip } from '../lib/safety/offlineCache';
 import type { ActiveTrip, EmergencyContact } from '../types/safety';
@@ -314,37 +312,6 @@ export function TravellerApp({
     () => hazards.filter((h) => h.gateName === accGate || h.gateName === stdGate),
     [hazards, accGate, stdGate]
   );
-
-  const stdSlope = useMeasuredSlope(routeId, 'std', routeCompare.standard, routePlace);
-  const accSlope = useMeasuredSlope(routeId, 'acc', routeCompare.accessible, routePlace);
-  const effortStd = useMemo(
-    () =>
-      computeEffort(routeCompare.standard, {
-        mode,
-        hazards,
-        smoothPct: built?.standard.smoothPct ?? 100,
-        measuredSlopeDeg: stdSlope,
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [routeCompare, mode, hazards, stdSlope, hazardTick]
-  );
-  const effortAcc = useMemo(
-    () =>
-      computeEffort(routeCompare.accessible, {
-        mode,
-        hazards,
-        smoothPct: built?.accessible.smoothPct ?? 100,
-        measuredSlopeDeg: accSlope,
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [routeCompare, mode, hazards, accSlope, hazardTick]
-  );
-  // Barriers weigh like stairs: impassable for wheelchairs, hard for walkers / blind users.
-  const barrierWeight = mode === 'wheelchair' ? 1000 : mode === 'walker' ? 150 : mode === 'blind' ? 100 : 0;
-  const stdBarriers = built?.standard.wheelchairBarriers ?? 0;
-  const accBarriers = built?.accessible.wheelchairBarriers ?? 0;
-  const easiestIsAccessible =
-    effortAcc.score + accBarriers * barrierWeight <= effortStd.score + stdBarriers * barrierWeight;
 
   const walkRoute: WalkRoute = useMemo(
     () => ({
@@ -681,10 +648,6 @@ export function TravellerApp({
               visualOnly={visualOnly}
               hasRoute={hasRoute}
               routeCompare={routeCompare}
-              effortStd={effortStd}
-              effortAcc={effortAcc}
-              easiestIsAccessible={easiestIsAccessible}
-              barriers={{ standard: stdBarriers, accessible: accBarriers }}
               hazards={routeHazards}
               stepFocusActive={stepFocusActive}
               stepFocusIndex={stepFocusIndex}
