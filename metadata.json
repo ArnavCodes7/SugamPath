@@ -1,0 +1,6 @@
+{
+  "name": "SugamPath — Accessible Transit & City Audit Dashboard",
+  "description": "City Audit Dashboard and gate-level accessibility intelligence platform for Indian transit hubs in Patiala, Chandigarh, and New Delhi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

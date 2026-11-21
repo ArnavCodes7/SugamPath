@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-label="Concrete station entrance with 6 steps and no wheelchair ramp">
+  <rect width="640" height="400" fill="#e4e2da" />
+  <!-- Building wall -->
+  <rect x="40" y="40" width="560" height="130" rx="8" fill="#c9c6bc" />
+  <rect x="230" y="65" width="180" height="105" rx="4" fill="#363942" />
+  <text x="320" y="122" text-anchor="middle" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#ffffff">GATE 4</text>
+  <!-- 6 Concrete Steps -->
+  <g stroke="#8e8b82" stroke-width="2">
+    <rect x="90" y="170" width="460" height="28" fill="#b7b4aa" />
+    <rect x="80" y="198" width="480" height="28" fill="#c5c2b8" />
+    <rect x="70" y="226" width="500" height="28" fill="#b7b4aa" />
+    <rect x="60" y="254" width="520" height="28" fill="#c5c2b8" />
+    <rect x="50" y="282" width="540" height="28" fill="#b7b4aa" />
+    <rect x="40" y="310" width="560" height="30" fill="#c5c2b8" />
+  </g>
+  <!-- Broken lift notice sign on right -->
+  <rect x="455" y="70" width="115" height="65" rx="8" fill="#fdebe9" stroke="#d6382c" stroke-width="3" />
+  <text x="512" y="99" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#d6382c">LIFT</text>
+  <text x="512" y="119" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#d6382c">CLOSED</text>
+  <!-- Sample tag -->
+  <rect x="20" y="20" width="130" height="32" rx="16" fill="#17181b" opacity="0.85" />
+  <text x="85" y="41" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#ffc72c">SAMPLE DATA</text>
+</svg>

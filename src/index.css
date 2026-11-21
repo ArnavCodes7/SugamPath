@@ -1,0 +1,107 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg-paper: #f3f3f1;
+  --bg-surface: #ffffff;
+  --bg-subtle: #eaeae6;
+  --ink-primary: #17181b;
+  --ink-secondary: #5b5f66;
+  --border-line: #dcdcd6;
+  --tactile-yellow: #ffc72c;
+  --tactile-yellow-soft: #fff3c9;
+  --tactile-yellow-ink: #17181b;
+  --status-good: #1f8a5b;
+  --status-good-soft: #e6f4ed;
+  --status-amber: #b7791f;
+  --status-amber-soft: #fef5e4;
+  --status-red: #d6382c;
+  --status-red-soft: #fdebe9;
+  --focus-ring: #17181b;
+  --map-bg: #f4f2eb;
+  --map-park: #dcefd8;
+  --map-block: #e4e2da;
+  --map-road: #ffffff;
+  --map-arterial: #fef6dc;
+  --map-road-stroke: #dcd9cf;
+  --map-label: #74787e;
+  --map-area-fill: rgba(31, 138, 91, 0.08);
+}
+
+.dark {
+  --bg-paper: #17181b;
+  --bg-surface: #1f2125;
+  --bg-subtle: #282a30;
+  --ink-primary: #f5f5f3;
+  --ink-secondary: #b3b7bf;
+  --border-line: #363942;
+  --tactile-yellow: #ffc72c;
+  --tactile-yellow-soft: #332a0d;
+  --tactile-yellow-ink: #17181b;
+  --status-good: #34c785;
+  --status-good-soft: #132e22;
+  --status-amber: #f5b041;
+  --status-amber-soft: #332510;
+  --status-red: #ff6b60;
+  --status-red-soft: #381816;
+  --focus-ring: #ffc72c;
+  --map-bg: #181a1f;
+  --map-park: #1d2d22;
+  --map-block: #23262d;
+  --map-road: #2e323b;
+  --map-arterial: #3a3423;
+  --map-road-stroke: #3d424d;
+  --map-label: #9da3ae;
+  --map-area-fill: rgba(255, 199, 44, 0.1);
+}
+
+@layer base {
+  html {
+    font-family: 'Public Sans', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-paper);
+    color: var(--ink-primary);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  .font-mono-tabular {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  *:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+html.text-scale-lg {
+  font-size: 112.5%;
+}
+
+html.text-scale-xl {
+  font-size: 125%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
