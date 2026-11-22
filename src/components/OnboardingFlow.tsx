@@ -17,12 +17,20 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { getSpeechLocale, STRINGS } from '../lib/i18n';
+import { SAFE } from '../lib/i18nSafety';
+import { EmergencyContactCard } from './safety/EmergencyContactCard';
 import type { CitySlug, LanguageCode, TravelMode, UserProfile, UserRole } from '../types/sugampath';
 
 interface OnboardingFlowProps {
   initialProfile: UserProfile;
   onComplete: (profile: UserProfile) => void;
 }
+
+const OPTIONAL_LABEL: Record<LanguageCode, { tag: string; hint: string }> = {
+  en: { tag: 'Optional', hint: 'Add someone we can alert if you need help. You can skip this and add it later.' },
+  hi: { tag: 'वैकल्पिक', hint: 'किसी ऐसे व्यक्ति को जोड़ें जिसे मदद की ज़रूरत पर सूचित किया जा सके। आप इसे छोड़कर बाद में जोड़ सकते हैं।' },
+  pa: { tag: 'ਵਿਕਲਪਿਕ', hint: 'ਕਿਸੇ ਅਜਿਹੇ ਵਿਅਕਤੀ ਨੂੰ ਜੋੜੋ ਜਿਸਨੂੰ ਮਦਦ ਦੀ ਲੋੜ ਪੈਣ ਤੇ ਸੂਚਿਤ ਕੀਤਾ ਜਾ ਸਕੇ। ਤੁਸੀਂ ਇਸਨੂੰ ਛੱਡ ਕੇ ਬਾਅਦ ਵਿੱਚ ਜੋੜ ਸਕਦੇ ਹੋ।' },
+};
 
 export function OnboardingFlow({ initialProfile, onComplete }: OnboardingFlowProps) {
   const [step, setStep] = useState<number>(1);
@@ -540,6 +548,23 @@ export function OnboardingFlow({ initialProfile, onComplete }: OnboardingFlowPro
                 </li>
               </ul>
               <p className="text-xs text-[var(--ink-secondary)] pt-1">{t.replayGuideHint}</p>
+            </div>
+
+            {/* Optional emergency contact */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-[var(--ink-primary)]">{SAFE[draft.language].contactTitle}</h2>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--bg-paper)] border border-[var(--border-line)] text-[var(--ink-secondary)]">
+                  {OPTIONAL_LABEL[draft.language].tag}
+                </span>
+              </div>
+              <p className="text-xs text-[var(--ink-secondary)]">{OPTIONAL_LABEL[draft.language].hint}</p>
+              <EmergencyContactCard
+                language={draft.language}
+                contact={draft.emergencyContact}
+                onChange={(c) => setDraft((p) => ({ ...p, emergencyContact: c }))}
+                large={draft.mode === 'blind'}
+              />
             </div>
 
             <button

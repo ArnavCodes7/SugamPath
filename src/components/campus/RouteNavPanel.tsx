@@ -1,4 +1,4 @@
-import { Navigation, ShieldCheck, Volume2, VolumeX } from 'lucide-react';
+import { ShieldCheck, Volume2, VolumeX } from 'lucide-react';
 import type { WalkSession } from '../../hooks/useWalkSession';
 import { SAFE } from '../../lib/i18nSafety';
 import { STRINGS } from '../../lib/i18n';
@@ -150,17 +150,6 @@ export function RouteNavPanel(p: Props) {
       {p.blind && (
         <EmergencyContactCard language={p.language} contact={p.emergencyContact} onChange={p.onSaveContact} large />
       )}
-
-      <button
-        type="button"
-        onClick={p.beginWalk}
-        className={`w-full rounded-2xl bg-[var(--ink-primary)] text-[var(--bg-surface)] font-bold flex items-center justify-center gap-2 ${
-          p.blind ? 'py-5 text-lg min-h-[64px]' : 'py-4 text-base min-h-[54px]'
-        }`}
-      >
-        <Navigation className="w-5 h-5" aria-hidden="true" />
-        <span>{t.startNavigationBtn}</span>
-      </button>
 
       <div className="bg-[var(--bg-paper)] border border-[var(--border-line)] rounded-3xl p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">

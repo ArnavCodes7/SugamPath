@@ -288,3 +288,66 @@ export function placeFacts(
   }
   return { smoothPct: known ? Math.round((smooth / known) * 100) : null, barriers, steps, segments };
 }
+
+/**
+ * Self-heals gates whose graph node has no path attached (e.g. after the data pipeline re-runs and
+ * renumbers nodes): re-snaps each such place to the nearest node of the main connected network.
+ * Returns the same map when nothing needs repairing.
+ */
+export function repairGateNodes(
+  network: NetworkGeoJson | null,
+  places: { external_id: string; lon: number; lat: number }[] | null,
+  gateNodes: GateNodes | null,
+  maxSnapM = 150
+): GateNodes | null {
+  const feats = network?.features ?? [];
+  if (!feats.length || !places || !gateNodes) return gateNodes;
+
+  // Union-find over nodes to find the largest connected component.
+  const parent = new Map<number, number>();
+  const find = (x: number): number => {
+    let r = x;
+    while (parent.get(r) !== r) r = parent.get(r)!;
+    while (parent.get(x) !== r) {
+      const n = parent.get(x)!;
+      parent.set(x, r);
+      x = n;
+    }
+    return r;
+  };
+  const pos = new Map<number, [number, number]>();
+  for (const f of feats) {
+    const { source, target } = f.properties;
+    const c = f.geometry.coordinates;
+    if (!c.length) continue;
+    if (!pos.has(source)) pos.set(source, [c[0][0], c[0][1]]);
+    if (!pos.has(target)) pos.set(target, [c[c.length - 1][0], c[c.length - 1][1]]);
+    for (const n of [source, target]) if (!parent.has(n)) parent.set(n, n);
+    parent.set(find(source), find(target));
+  }
+  const sizes = new Map<number, number>();
+  for (const n of parent.keys()) sizes.set(find(n), (sizes.get(find(n)) ?? 0) + 1);
+  let mainRoot = -1;
+  let best = 0;
+  for (const [r, s] of sizes) if (s > best) ((best = s), (mainRoot = r));
+
+  let out: GateNodes | null = null;
+  for (const p of places) {
+    const cur = gateNodes[p.external_id];
+    if (cur != null && parent.has(cur) && find(cur) === mainRoot) continue; // already connected
+    const proj = toMeters(p.lat);
+    const pp = proj(p.lon, p.lat);
+    let bestNode: number | null = null;
+    let bestD = maxSnapM;
+    for (const [n, [lon, lat]] of pos) {
+      if (find(n) !== mainRoot) continue;
+      const q = proj(lon, lat);
+      const d = Math.hypot(q[0] - pp[0], q[1] - pp[1]);
+      if (d < bestD) ((bestD = d), (bestNode = n));
+    }
+    if (bestNode == null) continue;
+    out ??= { ...gateNodes };
+    out[p.external_id] = bestNode;
+  }
+  return out ?? gateNodes;
+}

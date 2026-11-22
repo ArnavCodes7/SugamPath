@@ -640,6 +640,11 @@ export function TravellerApp({
           initialFrom={routeFrom}
           onRouteChange={setLiveRoute}
           livePosition={livePos}
+          startAction={
+            hasRoute && !walking
+              ? { label: t.startNavigationBtn, onClick: () => void beginWalk(), large: isBlindSafeMode }
+              : null
+          }
           className="md:h-[calc(100dvh-3.5rem-2.5rem)]"
           panel={
             <RouteNavPanel

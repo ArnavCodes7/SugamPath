@@ -21,6 +21,7 @@ import {
   Layers,
   LocateFixed,
   Loader2,
+  Navigation as NavIcon,
   PersonStanding,
   RefreshCw,
   Route as RouteIcon,
@@ -37,7 +38,7 @@ import {
   type RouteLeg,
 } from '../../lib/accessibility-types';
 import { supabase } from '../../lib/supabase';
-import { findCampusRoute, snapBarriers } from '../../lib/campusRouter';
+import { findCampusRoute, repairGateNodes, snapBarriers } from '../../lib/campusRouter';
 import { retryCampusData, useCampusData } from '../../hooks/useCampusData';
 import type { LanguageCode } from '../../types/sugampath';
 import { PlacePicker } from './PlacePicker';
@@ -101,6 +102,8 @@ interface Props {
   onRouteChange?: (r: CampusRoute | null) => void;
   /** Extra content under the route result (navigation panel). */
   panel?: React.ReactNode;
+  /** Primary action shown right under a found route (e.g. Start step-by-step). */
+  startAction?: { label: string; onClick: () => void; large?: boolean } | null;
   /** Live GPS position while walking. */
   livePosition?: { lat: number; lng: number } | null;
 }
@@ -124,12 +127,14 @@ export function CampusMap({
   initialFrom = null,
   onRouteChange,
   panel,
+  startAction = null,
   livePosition = null,
 }: Props) {
   const s = CAMPUS_STRINGS[language] ?? CAMPUS_STRINGS.en;
-  const { network, places, barriers, gateNodes, networkStatus, placesStatus, networkError, placesError } =
+  const { network, places, barriers, gateNodes: rawGateNodes, networkStatus, placesStatus, networkError, placesError } =
     useCampusData();
   const snapped = useMemo(() => snapBarriers(network, barriers), [network, barriers]);
+  const gateNodes = useMemo(() => repairGateNodes(network, places, rawGateNodes), [network, places, rawGateNodes]);
   const mapRef = useRef<MapRef>(null);
 
   const [satellite, setSatellite] = useState(false);
@@ -455,6 +460,18 @@ export function CampusMap({
                   <X className="w-4 h-4" aria-hidden="true" />
                 </button>
               </div>
+            )}
+            {route.status === 'ok' && startAction && (
+              <button
+                type="button"
+                onClick={startAction.onClick}
+                className={`mt-2 w-full rounded-xl bg-[var(--tactile-yellow)] text-[var(--tactile-yellow-ink)] border-2 border-[var(--ink-primary)] font-bold inline-flex items-center justify-center gap-2 ${
+                  startAction.large ? 'min-h-[64px] text-lg' : 'min-h-[52px] text-base'
+                }`}
+              >
+                <NavIcon className="w-5 h-5" aria-hidden="true" />
+                {startAction.label}
+              </button>
             )}
             {route.status === 'empty' && (
               <div className="rounded-xl border-2 border-[var(--status-amber)] bg-[var(--status-amber-soft)] p-3 text-sm font-bold text-[var(--ink-primary)]">
